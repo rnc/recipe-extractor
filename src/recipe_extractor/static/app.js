@@ -54,6 +54,7 @@
   const libraryCount = document.getElementById("library-count");
   const libraryEmpty = document.getElementById("library-empty");
   const libraryListEl = document.getElementById("library-list");
+  const statusLine = document.getElementById("status-line");
   const libraryBadge = document.getElementById("library-badge");
   const saveStatus = document.getElementById("save-status");
   const saveRetryBtn = document.getElementById("save-retry-btn");
@@ -694,7 +695,7 @@
 
   function updateLibraryControls() {
     const active = libraryEnabled && libraryId !== null;
-    saveStatus.style.display = active ? "inline" : "none";
+    statusLine.style.display = active ? "flex" : "none";
     restoreBtn.style.display = active && hasPrevious ? "inline-flex" : "none";
     reextractBtn.style.display = active ? "inline-flex" : "none";
     // A recipe re-opened from the library has no session "original" to reset to.
@@ -702,12 +703,13 @@
     resetBtn.style.display = openedFromLibrary ? "none" : "inline-flex";
     if (active && libraryState) {
       libraryBadge.textContent = STATE_LABELS[libraryState] || libraryState;
+      libraryBadge.dataset.state = libraryState;
       libraryBadge.title = libraryEditedAt
         ? `Last edited ${formatDate(libraryEditedAt)}`
         : "Not edited yet";
-      libraryBadge.style.display = "inline-block";
     } else {
-      libraryBadge.style.display = "none";
+      libraryBadge.textContent = "";
+      delete libraryBadge.dataset.state;
     }
   }
 

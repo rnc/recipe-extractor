@@ -74,11 +74,6 @@
             <button id="unit-uk-btn" class="btn-toggle" type="button" data-unit="uk">UK Standard</button>
           </div>
           <div class="actions-group">
-            <span id="library-badge" class="badge" style="display: none;"></span>
-            <span id="save-status" class="save-status" role="status" aria-live="polite"></span>
-            <button id="save-retry-btn" class="btn-secondary btn-small" type="button" style="display: none;">
-              Retry save
-            </button>
             <button id="restore-btn" class="btn-secondary btn-small" type="button" style="display: none;">
               Restore previous version
             </button>
@@ -95,6 +90,15 @@
               Print / Save as PDF
             </button>
           </div>
+        </div>
+
+        <!-- Library status: state of the stored recipe and whether edits are saved -->
+        <div id="status-line" class="status-line no-print" style="display: none;">
+          <span id="library-badge" class="status-state"></span>
+          <span id="save-status" class="save-status" role="status" aria-live="polite"></span>
+          <button id="save-retry-btn" class="btn-secondary btn-small" type="button" style="display: none;">
+            Retry save
+          </button>
         </div>
 
         <!-- Editor View -->
