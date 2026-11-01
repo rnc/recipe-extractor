@@ -13,7 +13,11 @@ FIXTURES_DIR = Path(__file__).parent / "fixtures"
 def test_health() -> None:
     response = client.get("/api/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "version": __version__}
+    assert response.json() == {
+        "status": "ok",
+        "version": __version__,
+        "library": False,
+    }
 
 
 def test_index_served() -> None:

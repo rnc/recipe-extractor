@@ -5,6 +5,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+LibraryState = Literal["extracted", "editing", "final"]
+
 
 class RecipeImage(BaseModel):
     """An extracted or user-supplied recipe image."""
@@ -116,6 +118,21 @@ class ExtractResponse(BaseModel):
     warnings: list[str] = Field(
         default_factory=list, description="Non-fatal warnings during extraction"
     )
+    library_id: int | None = Field(
+        default=None,
+        description="Library record id; null when persistence is disabled",
+    )
+    from_library: bool = Field(
+        default=False,
+        description="True when the saved library copy was returned, not a new fetch",
+    )
+    state: LibraryState | None = Field(
+        default=None, description="Saved state; null when not in the library"
+    )
+    edited_at: str | None = Field(default=None, description="Last saved edit time")
+    has_previous: bool = Field(
+        default=False, description="True when a previous version can be restored"
+    )
 
 
 class ConvertRequest(BaseModel):
@@ -135,3 +152,55 @@ class ConvertResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     recipe: Recipe
+
+
+class LibraryEntry(BaseModel):
+    """Summary of a saved recipe (no recipe body), for the library list."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    url: str
+    title: str
+    state: LibraryState
+    extracted_at: str = Field(description="ISO-8601 UTC timestamp")
+    edited_at: str | None = Field(
+        default=None, description="ISO-8601 UTC timestamp of the last saved edit"
+    )
+
+
+class LibraryRecord(LibraryEntry):
+    """A saved recipe with its full body."""
+
+    recipe: Recipe
+    has_previous: bool = Field(
+        default=False, description="True when a previous version can be restored"
+    )
+
+
+class LibrarySaveRequest(BaseModel):
+    """Request payload for PUT /api/library/{id} (auto-save)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    recipe: Recipe
+    state: Literal["editing", "final"] = "editing"
+    keep_previous: bool = Field(
+        default=False,
+        description="Copy the stored recipe to the restore slot before replacing it",
+    )
+
+
+class ReExtractResponse(BaseModel):
+    """Response payload for POST /api/library/{id}/re-extract."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    applied: bool = Field(description="False for the preview, true once committed")
+    changes: list[str] = Field(
+        default_factory=list, description="Human-readable summary of differences"
+    )
+    warnings: list[str] = Field(default_factory=list)
+    record: LibraryRecord | None = Field(
+        default=None, description="The updated record, present only when applied"
+    )

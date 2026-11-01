@@ -580,3 +580,75 @@ button:disabled {
   font-size: 0.85rem;
   color: var(--text-muted);
 }
+
+/* Saved recipes library */
+.library-card summary {
+  cursor: pointer;
+  font-weight: 600;
+  user-select: none;
+}
+
+.library-count {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.library-card .tagline {
+  margin-top: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.library-list {
+  list-style: none;
+  margin-top: 0.75rem;
+  max-height: 20rem;
+  overflow-y: auto;
+}
+
+.library-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+  border-top: 1px solid var(--border-color);
+}
+
+.library-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.library-info strong,
+.library-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.library-meta {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background-color: var(--secondary-color);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+}
+
+.save-status {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  align-self: center;
+}
+
+.save-status.save-failed {
+  color: var(--danger-color);
+  font-weight: 600;
+}

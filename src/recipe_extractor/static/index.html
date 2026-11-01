@@ -45,6 +45,17 @@
         </form>
       </section>
 
+      <!-- Saved recipes (hidden when started with --database=disabled) -->
+      <section id="library-card" class="card library-card" style="display: none;">
+        <details id="library-panel">
+          <summary>Saved recipes <span id="library-count" class="library-count"></span></summary>
+          <p id="library-empty" class="tagline">
+            Nothing saved yet. Recipes you extract are saved automatically.
+          </p>
+          <ul id="library-list" class="library-list"></ul>
+        </details>
+      </section>
+
       <!-- Alerts / Status Messages -->
       <div id="alert-box" class="alert" style="display: none;"></div>
 
@@ -63,6 +74,17 @@
             <button id="unit-uk-btn" class="btn-toggle" type="button" data-unit="uk">UK Standard</button>
           </div>
           <div class="actions-group">
+            <span id="library-badge" class="badge" style="display: none;"></span>
+            <span id="save-status" class="save-status" role="status" aria-live="polite"></span>
+            <button id="save-retry-btn" class="btn-secondary btn-small" type="button" style="display: none;">
+              Retry save
+            </button>
+            <button id="restore-btn" class="btn-secondary btn-small" type="button" style="display: none;">
+              Restore previous version
+            </button>
+            <button id="reextract-btn" class="btn-secondary btn-small" type="button" style="display: none;">
+              Re-extract
+            </button>
             <button id="undo-btn" class="btn-secondary btn-small" type="button" style="display: none;">
               Undo Delete
             </button>
