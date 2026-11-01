@@ -121,6 +121,19 @@ def test_convert_ingredient_butter_sticks() -> None:
     assert "softened" in converted.converted
 
 
+def test_convert_ingredient_countable_with_notes() -> None:
+    ing = Ingredient(
+        raw="4 green shallots, trimmed, thinly sliced, plus extra, to serve"
+    )
+    converted_metric = convert_ingredient(ing, "metric")
+    assert converted_metric.converted is not None
+    assert converted_metric.converted.startswith("4 green shallots")
+
+    converted_uk = convert_ingredient(ing, "uk")
+    assert converted_uk.converted is not None
+    assert converted_uk.converted.startswith("4 green shallots")
+
+
 def test_convert_ingredient_weight_oz_to_g() -> None:
     ing = Ingredient(raw="8 oz cream cheese")
     converted = convert_ingredient(ing, "metric")

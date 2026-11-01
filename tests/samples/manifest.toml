@@ -3,9 +3,9 @@
 # Real snapshots are downloaded into tests/samples_private/ (gitignored).
 
 [samples]
-# Format example:
-# [samples.lemon_cake]
-# url = "https://www.example.com/lemon-cake"
-# title = "Classic Lemon Drizzle Cake"
-# min_ingredients = 5
-# min_steps = 3
+
+[samples.one_pan_salmon_broccoli_bake]
+url = "https://www.taste.com.au/recipes/one-pan-salmon-broccoli-bake/m8i624wf"
+title = "One-pan salmon and broccoli bake"
+min_ingredients = 11
+min_steps = 3

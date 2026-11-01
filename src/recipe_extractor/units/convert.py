@@ -281,8 +281,8 @@ def convert_ingredient(
         if note:
             note = apply_uk_vocabulary(note)
 
-    # If no quantity or unit, return translated text
-    if q_val is None or not unit:
+    # If neither quantity nor unit exists, return translated text
+    if q_val is None and not parsed.quantity and not unit:
         converted_line = f"{name}, {note}" if note else name
         return ingredient.model_copy(
             update={
@@ -293,94 +293,147 @@ def convert_ingredient(
 
     converted_qty_str: str | None = None
 
+    # Handle countable items with quantity but no unit (e.g. "4 shallots")
+    if not unit:
+        if q_val is not None:
+            converted_qty_str = f"{round(q_val, 2):g}"
+        elif isinstance(parsed.quantity, str):
+            converted_qty_str = parsed.quantity
+        else:
+            converted_qty_str = ""
+
     # Handle Butter sticks
     if unit in ("stick", "sticks"):
-        # 1 stick = 1/2 cup = 113.4g (approx 115g)
-        grams = q_val * 113.4
-        converted_qty_str = round_culinary_weight(grams)
-        unit = ""
-
-    # Handle Weight (oz, lb)
-    elif unit in ("oz", "ounce", "ounces"):
-        grams = q_val * 28.3495
-        converted_qty_str = round_culinary_weight(grams)
-        unit = ""
-
-    elif unit in ("lb", "lbs", "pound", "pounds"):
-        grams = q_val * 453.592
-        converted_qty_str = round_culinary_weight(grams)
-        unit = ""
-
-    # Handle Volume (cups)
-    elif unit in ("cup", "cups", "c"):
-        # Check density table for volume-to-weight
-        density = find_ingredient_density(parsed.name or name)
-        if density is not None:
-            grams = q_val * density
+        if q_val is not None:
+            grams = q_val * 113.4
             converted_qty_str = round_culinary_weight(grams)
             unit = ""
         else:
-            # Fallback to volume in ml
-            cup_ml = 250.0 if effective_system == "uk" else source_cup_ml
-            ml = q_val * cup_ml
-            converted_qty_str = round_culinary_volume(ml)
+            converted_qty_str = str(parsed.quantity or "")
+
+    # Handle Weight (oz, lb)
+    elif unit in ("oz", "ounce", "ounces"):
+        if q_val is not None:
+            grams = q_val * 28.3495
+            converted_qty_str = round_culinary_weight(grams)
             unit = ""
+        else:
+            converted_qty_str = str(parsed.quantity or "")
+
+    elif unit in ("lb", "lbs", "pound", "pounds"):
+        if q_val is not None:
+            grams = q_val * 453.592
+            converted_qty_str = round_culinary_weight(grams)
+            unit = ""
+        else:
+            converted_qty_str = str(parsed.quantity or "")
+
+    # Handle Volume (cups)
+    elif unit in ("cup", "cups", "c"):
+        if q_val is not None:
+            # Check density table for volume-to-weight
+            density = find_ingredient_density(parsed.name or name)
+            if density is not None:
+                grams = q_val * density
+                converted_qty_str = round_culinary_weight(grams)
+                unit = ""
+            else:
+                # Fallback to volume in ml
+                cup_ml = 250.0 if effective_system == "uk" else source_cup_ml
+                ml = q_val * cup_ml
+                converted_qty_str = round_culinary_volume(ml)
+                unit = ""
+        else:
+            converted_qty_str = str(parsed.quantity or "")
 
     # Handle Fluid Ounces
     elif unit in ("fl oz", "fluid ounce", "fluid ounces"):
-        ml = q_val * 29.5735
-        converted_qty_str = round_culinary_volume(ml)
-        unit = ""
+        if q_val is not None:
+            ml = q_val * 29.5735
+            converted_qty_str = round_culinary_volume(ml)
+            unit = ""
+        else:
+            converted_qty_str = str(parsed.quantity or "")
 
     # Handle Pints
     elif unit in ("pint", "pints", "pt"):
-        # US pint = 473ml, UK pint = 568ml
-        pint_ml = 568.26 if effective_system == "uk" else 473.176
-        ml = q_val * pint_ml
-        converted_qty_str = round_culinary_volume(ml)
-        unit = ""
+        if q_val is not None:
+            # US pint = 473ml, UK pint = 568ml
+            pint_ml = 568.26 if effective_system == "uk" else 473.176
+            ml = q_val * pint_ml
+            converted_qty_str = round_culinary_volume(ml)
+            unit = ""
+        else:
+            converted_qty_str = str(parsed.quantity or "")
 
     # Handle Quarts
     elif unit in ("quart", "quarts", "qt"):
-        ml = q_val * 946.353
-        converted_qty_str = round_culinary_volume(ml)
-        unit = ""
+        if q_val is not None:
+            ml = q_val * 946.353
+            converted_qty_str = round_culinary_volume(ml)
+            unit = ""
+        else:
+            converted_qty_str = str(parsed.quantity or "")
 
     # Handle Gallons
     elif unit in ("gallon", "gallons", "gal"):
-        litres = q_val * 3.78541
-        converted_qty_str = f"{round(litres, 2):g}L"
-        unit = ""
+        if q_val is not None:
+            litres = q_val * 3.78541
+            converted_qty_str = f"{round(litres, 2):g}L"
+            unit = ""
+        else:
+            converted_qty_str = str(parsed.quantity or "")
 
     # Handle Tablespoons / Teaspoons
     elif unit in ("tbsp", "tablespoon", "tablespoons", "tbs", "tbl"):
-        converted_qty_str = f"{round(q_val, 2):g}"
+        converted_qty_str = (
+            f"{round(q_val, 2):g}" if q_val is not None else str(parsed.quantity or "")
+        )
         unit = "tbsp"
 
     elif unit in ("tsp", "teaspoon", "teaspoons"):
-        converted_qty_str = f"{round(q_val, 2):g}"
+        converted_qty_str = (
+            f"{round(q_val, 2):g}" if q_val is not None else str(parsed.quantity or "")
+        )
         unit = "tsp"
 
     # Handle existing metric units (g, kg, ml, l)
     elif unit in ("g", "gram", "grams"):
-        converted_qty_str = round_culinary_weight(q_val)
-        unit = ""
+        if q_val is not None:
+            converted_qty_str = round_culinary_weight(q_val)
+            unit = ""
+        else:
+            converted_qty_str = str(parsed.quantity or "")
 
     elif unit in ("kg", "kilogram", "kilograms"):
-        converted_qty_str = round_culinary_weight(q_val * 1000.0)
-        unit = ""
+        if q_val is not None:
+            converted_qty_str = round_culinary_weight(q_val * 1000.0)
+            unit = ""
+        else:
+            converted_qty_str = str(parsed.quantity or "")
 
     elif unit in ("ml", "milliliter", "milliliters", "millilitre", "millilitres"):
-        converted_qty_str = round_culinary_volume(q_val)
-        unit = ""
+        if q_val is not None:
+            converted_qty_str = round_culinary_volume(q_val)
+            unit = ""
+        else:
+            converted_qty_str = str(parsed.quantity or "")
 
     elif unit in ("l", "liter", "liters", "litre", "litres"):
-        converted_qty_str = round_culinary_volume(q_val * 1000.0)
-        unit = ""
+        if q_val is not None:
+            converted_qty_str = round_culinary_volume(q_val * 1000.0)
+            unit = ""
+        else:
+            converted_qty_str = str(parsed.quantity or "")
 
     else:
         # Unknown/container unit (e.g. pinch, clove, can) -> keep quantity and unit
-        converted_qty_str = f"{round(q_val, 2):g}"
+        if q_val is not None:
+            converted_qty_str = f"{round(q_val, 2):g}"
+        elif isinstance(parsed.quantity, str):
+            converted_qty_str = parsed.quantity
+        else:
+            converted_qty_str = ""
 
     # Build converted line
     parts: list[str] = []
