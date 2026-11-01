@@ -55,3 +55,29 @@ def test_extract_invalid_html_content() -> None:
     )
     assert response.status_code == 422
     assert "Could not extract" in response.json()["detail"]
+
+
+def test_convert_endpoint() -> None:
+    recipe_data = {
+        "title": "US Cupcake Recipe",
+        "ingredients": [
+            {"raw": "2 cups all-purpose flour"},
+            {"raw": "1 cup granulated sugar"},
+        ],
+        "steps": [
+            {"text": "Bake in oven at 350°F in a 9-inch pan."},
+        ],
+        "unit_system": "original",
+    }
+
+    response = client.post(
+        "/api/convert",
+        json={"recipe": recipe_data, "unit_system": "uk"},
+    )
+    assert response.status_code == 200
+    res_json = response.json()
+    recipe = res_json["recipe"]
+    assert recipe["unit_system"] == "uk"
+    assert "240g plain flour" in (recipe["ingredients"][0]["converted"] or "")
+    assert "180°C" in recipe["steps"][0]["text"]
+    assert "23cm" in recipe["steps"][0]["text"]

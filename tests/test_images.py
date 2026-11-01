@@ -7,6 +7,7 @@ from recipe_extractor.fetch import FetchedResource
 from recipe_extractor.images import (
     discover_image_urls,
     fetch_and_embed_images,
+    is_ad_or_clutter_url,
     sniff_image_mime,
 )
 
@@ -89,3 +90,39 @@ def test_fetch_and_embed_images_embeds_and_filters_svg() -> None:
     assert images[1].src.startswith("data:image/png;base64,")
     assert images[1].selected is False
     assert any("unsupported or unsafe" in w for w in warnings)
+
+
+def test_is_ad_or_clutter_url() -> None:
+    blocklist = {"adservice.google.com", "doubleclick.net"}
+    assert is_ad_or_clutter_url("https://doubleclick.net/ad.jpg", blocklist) is True
+    assert (
+        is_ad_or_clutter_url("https://sub.adservice.google.com/pixel.png", blocklist)
+        is True
+    )
+    assert is_ad_or_clutter_url("https://example.com/tracking/pixel.gif") is True
+    assert is_ad_or_clutter_url("https://secure.gravatar.com/avatar/123") is True
+    assert (
+        is_ad_or_clutter_url("https://example.com/photos/delicious-cake.jpg") is False
+    )
+
+
+def test_fallback_image_discovery_filters_clutter_containers() -> None:
+    html = """
+    <html>
+      <body>
+        <aside class="sidebar-ad">
+          <img src="https://example.com/sidebar-banner.jpg" />
+        </aside>
+        <div class="advertisement">
+          <img src="https://example.com/ad-box.jpg" />
+        </div>
+        <div class="recipe-content">
+          <img src="https://example.com/real-recipe-photo.jpg" />
+        </div>
+      </body>
+    </html>
+    """
+    urls = discover_image_urls(html, base_url="https://example.com")
+    assert "https://example.com/real-recipe-photo.jpg" in urls
+    assert "https://example.com/sidebar-banner.jpg" not in urls
+    assert "https://example.com/ad-box.jpg" not in urls

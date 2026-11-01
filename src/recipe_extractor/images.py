@@ -6,6 +6,9 @@ from __future__ import annotations
 import base64
 import json
 import logging
+import tempfile
+import time
+from pathlib import Path
 from typing import Any
 from urllib.parse import urljoin, urlparse
 
@@ -23,6 +26,46 @@ ALLOWED_IMAGE_MIMES = {
     "image/gif",
     "image/avif",
 }
+
+PETER_LOWE_LIST_URL = (
+    "https://pgl.yoyo.org/adservers/serverlist.php?hostformat=nohtml&showintro=0"
+)
+CACHE_MAX_AGE_SECONDS = 86400  # 24 hours
+TEMP_CACHE_FILE = Path(tempfile.gettempdir()) / "recipe_extractor_ad_servers.txt"
+
+# In-memory runtime cache for the Peter Lowe ad server list
+_AD_SERVER_CACHE: set[str] | None = None
+
+CLUTTER_URL_SUBSTRINGS = (
+    "/ads/",
+    "/advert/",
+    "/banner/",
+    "pixel",
+    "1x1",
+    "tracking",
+    "gravatar.com/avatar",
+    "author-avatar",
+    "badge",
+    "icon-",
+    "/icons/",
+    "social-share",
+)
+
+CLUTTER_CONTAINER_CLASSES = (
+    "ad",
+    "advert",
+    "advertisement",
+    "sponsor",
+    "sponsored",
+    "sidebar",
+    "social",
+    "share",
+    "author",
+    "profile",
+    "comments",
+    "footer",
+    "header",
+)
 
 
 def sniff_image_mime(content: bytes) -> str | None:
@@ -55,6 +98,81 @@ def sniff_image_mime(content: bytes) -> str | None:
     return None
 
 
+def get_ad_server_blocklist(fetcher: Fetcher | None = None) -> set[str]:
+    """Retrieve Peter Lowe's ad server list from disk cache or fetch on-demand."""
+    global _AD_SERVER_CACHE
+    if _AD_SERVER_CACHE is not None:
+        return _AD_SERVER_CACHE
+
+    domains: set[str] = set()
+    text = ""
+
+    # 1. Check if temporary cache file exists and is still fresh (< 24h old)
+    if TEMP_CACHE_FILE.exists():
+        try:
+            mtime = TEMP_CACHE_FILE.stat().st_mtime
+            if time.time() - mtime < CACHE_MAX_AGE_SECONDS:
+                text = TEMP_CACHE_FILE.read_text(encoding="utf-8")
+        except Exception as e:
+            logger.debug("Could not read temp ad cache file: %s", e)
+
+    # 2. Fetch fresh list over the network if not in temp cache
+    if not text:
+        try:
+            if fetcher is not None:
+                res = fetcher.fetch(PETER_LOWE_LIST_URL, timeout=5.0)
+                text = res.text
+            else:
+                import requests
+
+                resp = requests.get(PETER_LOWE_LIST_URL, timeout=5.0)
+                text = resp.text if resp.status_code == 200 else ""
+
+            if text:
+                try:
+                    TEMP_CACHE_FILE.write_text(text, encoding="utf-8")
+                except Exception as e:
+                    logger.debug("Could not save ad cache to temp file: %s", e)
+        except Exception as e:
+            logger.debug(
+                "Could not fetch Peter Lowe list (offline or network error): %s", e
+            )
+
+    # 3. Parse domain list into in-memory set
+    if text:
+        for line in text.splitlines():
+            item = line.strip().lower()
+            if item and not item.startswith("#"):
+                domains.add(item)
+        logger.info(
+            "Loaded %d ad server domains (from temp cache/remote)", len(domains)
+        )
+
+    _AD_SERVER_CACHE = domains
+    return _AD_SERVER_CACHE
+
+
+def is_ad_or_clutter_url(url: str, blocklist: set[str] | None = None) -> bool:
+    """Check if an image URL matches ad servers or clutter patterns."""
+    url_lower = url.lower()
+    if any(sub in url_lower for sub in CLUTTER_URL_SUBSTRINGS):
+        return True
+
+    if blocklist:
+        parsed = urlparse(url)
+        hostname = (parsed.hostname or "").lower()
+        if hostname in blocklist:
+            return True
+        # Check parent domains
+        parts = hostname.split(".")
+        if len(parts) > 2:
+            parent = ".".join(parts[1:])
+            if parent in blocklist:
+                return True
+
+    return False
+
+
 def _extract_urls_from_ld_json_value(value: Any) -> list[str]:
     """Extract image URLs recursively from JSON-LD property values."""
     urls: list[str] = []
@@ -72,8 +190,13 @@ def _extract_urls_from_ld_json_value(value: Any) -> list[str]:
     return urls
 
 
-def discover_image_urls(html: str, base_url: str = "") -> list[str]:
-    """Find all candidate recipe image URLs from JSON-LD and OpenGraph tags."""
+def discover_image_urls(
+    html: str,
+    base_url: str = "",
+    *,
+    fetcher: Fetcher | None = None,
+) -> list[str]:
+    """Find image URLs from JSON-LD, OpenGraph, and fallback HTML tags."""
     found_urls: list[str] = []
     soup = BeautifulSoup(html, "html.parser")
 
@@ -121,6 +244,40 @@ def discover_image_urls(html: str, base_url: str = "") -> list[str]:
             if isinstance(content, str) and content.strip():
                 found_urls.append(content.strip())
 
+    # 3. Fallback: If no structured images found, scrape non-clutter <img> tags
+    if not found_urls:
+        ad_blocklist = get_ad_server_blocklist(fetcher)
+        for img in soup.find_all("img"):
+            # Check if inside aside, nav, footer, header
+            if img.find_parent(["aside", "nav", "footer", "header"]):
+                continue
+
+            # Check parent class/id for ad or clutter hints
+            parent_clutter = False
+            for parent in img.parents:
+                raw_cls = parent.get("class")
+                classes = (
+                    " ".join(raw_cls)
+                    if isinstance(raw_cls, list)
+                    else str(raw_cls or "")
+                ).lower()
+                pid = str(parent.get("id") or "").lower()
+                if any(c in classes or c in pid for c in CLUTTER_CONTAINER_CLASSES):
+                    parent_clutter = True
+                    break
+            if parent_clutter:
+                continue
+
+            src = img.get("src") or img.get("data-src") or img.get("data-original")
+            if isinstance(src, str) and src.strip():
+                resolved_src = (
+                    urljoin(base_url, src.strip()) if base_url else src.strip()
+                )
+                if not is_ad_or_clutter_url(resolved_src, ad_blocklist):
+                    found_urls.append(src.strip())
+    else:
+        ad_blocklist = None
+
     # Normalise and deduplicate URLs
     clean_urls: list[str] = []
     seen: set[str] = set()
@@ -134,7 +291,8 @@ def discover_image_urls(html: str, base_url: str = "") -> list[str]:
 
         if resolved not in seen:
             seen.add(resolved)
-            clean_urls.append(resolved)
+            if not is_ad_or_clutter_url(resolved, ad_blocklist):
+                clean_urls.append(resolved)
 
     return clean_urls
 

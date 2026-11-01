@@ -4,15 +4,36 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+import re
+from typing import Any, Literal
 
 from recipe_scrapers import scrape_html
 
 from recipe_extractor.fetch import Fetcher
 from recipe_extractor.images import discover_image_urls, fetch_and_embed_images
 from recipe_extractor.models import Ingredient, Recipe, RecipeImage, Step
+from recipe_extractor.units import convert_recipe, parse_ingredient_line
 
 logger = logging.getLogger(__name__)
+
+CLUTTER_TEXT_PATTERNS = [
+    r"^\s*(?:rate|review)\s+this\s+recipe\b",
+    r"^\s*leave\s+a\s+(?:comment|review)\b",
+    r"^\s*pin\s+(?:this\s+recipe|for\s+later)\b",
+    r"^\s*follow\s+us\s+on\b",
+    r"^\s*sign\s+up\s+for\b",
+    r"^\s*jump\s+to\s+recipe\b",
+    r"^\s*print\s+(?:this\s+)?recipe\b",
+    r"^\s*nutrition\s+(?:facts|information)\b",
+    r"^\s*did\s+you\s+make\s+this\b",
+    r"^\s*share\s+your\s+photo\b",
+]
+
+
+def is_clutter_text(text: str) -> bool:
+    """Check if a line of text is a promotional / social media clutter line."""
+    text_clean = text.strip().lower()
+    return any(re.search(pattern, text_clean) for pattern in CLUTTER_TEXT_PATTERNS)
 
 
 def _safe_call(fn: Any, default: Any = None) -> Any:
@@ -30,6 +51,7 @@ def extract_recipe(
     *,
     fetcher: Fetcher | None = None,
     download_images: bool = True,
+    unit_system: Literal["original", "metric", "uk"] = "original",
 ) -> tuple[Recipe, list[str]]:
     """Extract a canonical Recipe object from HTML content and an optional URL."""
     warnings: list[str] = []
@@ -55,37 +77,54 @@ def extract_recipe(
     cook_time = _safe_call(scraper.cook_time, None)
 
     # Extract ingredients (with groups if available)
-    ingredients: list[Ingredient] = []
+    raw_ing_entries: list[tuple[str, str | None]] = []
     groups = _safe_call(scraper.ingredient_groups, [])
     if groups:
         for grp in groups:
             grp_purpose = getattr(grp, "purpose", None)
             grp_items = getattr(grp, "ingredients", [])
             for item in grp_items:
-                if isinstance(item, str) and item.strip():
-                    ingredients.append(
-                        Ingredient(raw=item.strip(), group=grp_purpose or None)
-                    )
+                if isinstance(item, str) and item.strip() and not is_clutter_text(item):
+                    raw_ing_entries.append((item.strip(), grp_purpose or None))
 
-    if not ingredients:
+    if not raw_ing_entries:
         raw_ingredients = _safe_call(scraper.ingredients, [])
         for item in raw_ingredients:
-            if isinstance(item, str) and item.strip():
-                ingredients.append(Ingredient(raw=item.strip()))
+            if isinstance(item, str) and item.strip() and not is_clutter_text(item):
+                raw_ing_entries.append((item.strip(), None))
+
+    ingredients: list[Ingredient] = []
+    for raw_line, grp in raw_ing_entries:
+        parsed = parse_ingredient_line(raw_line)
+        ingredients.append(
+            Ingredient(
+                raw=raw_line,
+                quantity=parsed.quantity,
+                unit=parsed.unit,
+                name=parsed.name,
+                note=parsed.note,
+                group=grp,
+                original_raw=raw_line,
+            )
+        )
 
     # Extract instructions / steps
     steps: list[Step] = []
+    raw_step_texts: list[str] = []
     instruction_list = _safe_call(scraper.instructions_list, [])
     if instruction_list:
         for inst in instruction_list:
-            if isinstance(inst, str) and inst.strip():
-                steps.append(Step(text=inst.strip()))
+            if isinstance(inst, str) and inst.strip() and not is_clutter_text(inst):
+                raw_step_texts.append(inst.strip())
     else:
         instructions_text = _safe_call(scraper.instructions, "")
         if instructions_text:
             for line in instructions_text.splitlines():
-                if line.strip():
-                    steps.append(Step(text=line.strip()))
+                if line.strip() and not is_clutter_text(line):
+                    raw_step_texts.append(line.strip())
+
+    for txt in raw_step_texts:
+        steps.append(Step(text=txt))
 
     # Extract notes or description
     notes: list[str] = []
@@ -95,7 +134,7 @@ def extract_recipe(
         notes.append(description.strip())
 
     # Extract images
-    discovered_images = discover_image_urls(html, base_url=url)
+    discovered_images = discover_image_urls(html, base_url=url, fetcher=fetcher)
     scraper_img = _safe_call(scraper.image, None)
     if (
         scraper_img
@@ -139,5 +178,8 @@ def extract_recipe(
         notes=notes,
         unit_system="original",
     )
+
+    if unit_system != "original":
+        recipe = convert_recipe(recipe, unit_system)
 
     return recipe, warnings

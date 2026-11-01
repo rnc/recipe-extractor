@@ -9,7 +9,13 @@ from pydantic import BaseModel
 from recipe_extractor import __version__
 from recipe_extractor.extract import extract_recipe
 from recipe_extractor.fetch import FetchError, SafeFetcher
-from recipe_extractor.models import ExtractRequest, ExtractResponse
+from recipe_extractor.models import (
+    ConvertRequest,
+    ConvertResponse,
+    ExtractRequest,
+    ExtractResponse,
+)
+from recipe_extractor.units import convert_recipe
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +73,7 @@ def extract(request: ExtractRequest) -> ExtractResponse:
             url=target_url,
             fetcher=fetcher,
             download_images=bool(target_url),
+            unit_system=request.unit_system,
         )
     except Exception as e:
         logger.warning("Recipe extraction failed for '%s': %s", target_url, e)
@@ -76,3 +83,17 @@ def extract(request: ExtractRequest) -> ExtractResponse:
         ) from e
 
     return ExtractResponse(recipe=recipe, warnings=warnings)
+
+
+@router.post("/convert", response_model=ConvertResponse)
+def convert(request: ConvertRequest) -> ConvertResponse:
+    """Convert recipe units (weights, volumes, temperatures, dimensions, vocabulary)."""
+    try:
+        converted_recipe = convert_recipe(request.recipe, request.unit_system)
+        return ConvertResponse(recipe=converted_recipe)
+    except Exception as e:
+        logger.warning("Unit conversion failed: %s", e)
+        raise HTTPException(
+            status_code=400,
+            detail=f"Failed to convert recipe units: {e}",
+        ) from e

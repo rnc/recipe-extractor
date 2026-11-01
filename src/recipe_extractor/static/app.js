@@ -29,6 +29,11 @@
   const resetBtn = document.getElementById("reset-btn");
   const undoBtn = document.getElementById("undo-btn");
 
+  // Unit toggle buttons
+  const unitOrigBtn = document.getElementById("unit-orig-btn");
+  const unitMetricBtn = document.getElementById("unit-metric-btn");
+  const unitUkBtn = document.getElementById("unit-uk-btn");
+
   // Metadata Inputs
   const titleInput = document.getElementById("recipe-title");
   const servingsInput = document.getElementById("recipe-servings");
@@ -233,8 +238,80 @@
     });
   }
 
+  function updateUnitToggleButtons() {
+    const current = (currentRecipe && currentRecipe.unit_system) || "original";
+    [unitOrigBtn, unitMetricBtn, unitUkBtn].forEach((btn) => {
+      if (btn) {
+        if (btn.getAttribute("data-unit") === current) {
+          btn.classList.add("active");
+        } else {
+          btn.classList.remove("active");
+        }
+      }
+    });
+  }
+
+  async function switchUnitSystem(targetSystem) {
+    if (!currentRecipe) return;
+    updateRecipeFromEditor();
+
+    if (targetSystem === "original") {
+      // Revert ingredients and text
+      currentRecipe.unit_system = "original";
+      currentRecipe.ingredients.forEach((ing) => {
+        ing.unit_override = null;
+        if (ing.original_raw) {
+          ing.raw = ing.original_raw;
+        }
+        ing.converted = null;
+      });
+      // Restore steps and notes from originalRecipe if available
+      if (originalRecipe && originalRecipe.steps) {
+        currentRecipe.steps.forEach((st, i) => {
+          if (originalRecipe.steps[i]) {
+            st.text = originalRecipe.steps[i].text;
+          }
+        });
+      }
+      if (originalRecipe && originalRecipe.notes) {
+        currentRecipe.notes.forEach((nt, i) => {
+          if (originalRecipe.notes[i]) {
+            currentRecipe.notes[i] = originalRecipe.notes[i];
+          }
+        });
+      }
+      updateUnitToggleButtons();
+      renderEditor();
+      renderPreview();
+      return;
+    }
+
+    try {
+      const resp = await fetch("/api/convert", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          recipe: currentRecipe,
+          unit_system: targetSystem,
+        }),
+      });
+
+      const data = await resp.json();
+      if (!resp.ok) {
+        throw new Error(data.detail || "Failed to convert units.");
+      }
+
+      currentRecipe = data.recipe;
+      updateUnitToggleButtons();
+      renderEditor();
+      renderPreview();
+    } catch (err) {
+      showAlert(err.message || "Unit conversion failed.", "error");
+    }
+  }
+
   function renderIngredients() {
-    ingredientsList.innerHTML = "";
+    ingredientsList.textContent = "";
     currentRecipe.ingredients.forEach((ing, index) => {
       const row = document.createElement("div");
       row.className = "list-row";
@@ -255,15 +332,67 @@
         ing.group = e.target.value.trim() || null;
       });
 
-      // Multi-line Raw text area
+      // Content column for textarea and conversion override helper
+      const contentCol = document.createElement("div");
+      contentCol.className = "ingredient-content-col";
+
+      const displayText =
+        currentRecipe.unit_system !== "original" && ing.converted && ing.unit_override !== "original"
+          ? ing.converted
+          : ing.raw;
+
       const rawTextarea = document.createElement("textarea");
       rawTextarea.placeholder = "Ingredient description";
-      rawTextarea.value = ing.raw;
+      rawTextarea.value = displayText;
       rawTextarea.rows = 1;
       rawTextarea.addEventListener("input", (e) => {
-        ing.raw = e.target.value;
+        if (currentRecipe.unit_system !== "original" && ing.converted && ing.unit_override !== "original") {
+          ing.converted = e.target.value;
+        } else {
+          ing.raw = e.target.value;
+          ing.original_raw = e.target.value;
+        }
         autoResizeTextarea(rawTextarea);
       });
+
+      contentCol.appendChild(rawTextarea);
+
+      // If converted and differs from original, show override / revert option
+      const hasConversion =
+        currentRecipe.unit_system !== "original" &&
+        ing.converted &&
+        ing.original_raw &&
+        ing.converted !== ing.original_raw;
+
+      if (hasConversion) {
+        const hint = document.createElement("div");
+        hint.className = "ingredient-override-hint";
+
+        const origSpan = document.createElement("span");
+        origSpan.textContent = `Orig: ${ing.original_raw}`;
+
+        const toggleBtn = document.createElement("button");
+        toggleBtn.type = "button";
+        toggleBtn.className = "btn-link";
+
+        if (ing.unit_override === "original") {
+          toggleBtn.textContent = "Use converted";
+          toggleBtn.addEventListener("click", () => {
+            ing.unit_override = null;
+            renderIngredients();
+          });
+        } else {
+          toggleBtn.textContent = "Revert to original";
+          toggleBtn.addEventListener("click", () => {
+            ing.unit_override = "original";
+            renderIngredients();
+          });
+        }
+
+        hint.appendChild(origSpan);
+        hint.appendChild(toggleBtn);
+        contentCol.appendChild(hint);
+      }
 
       // Delete button
       const delBtn = document.createElement("button");
@@ -281,7 +410,7 @@
 
       row.appendChild(handle);
       row.appendChild(groupInput);
-      row.appendChild(rawTextarea);
+      row.appendChild(contentCol);
       row.appendChild(delBtn);
 
       setupDragAndDrop(
@@ -449,7 +578,7 @@
     }
 
     // Ingredients
-    prevIngredientsList.innerHTML = "";
+    prevIngredientsList.textContent = "";
     let currentGroup = null;
     (currentRecipe.ingredients || []).forEach((ing) => {
       if (ing.group && ing.group !== currentGroup) {
@@ -462,9 +591,14 @@
         currentGroup = null;
       }
 
-      if (ing.raw.trim()) {
+      const activeText =
+        currentRecipe.unit_system !== "original" && ing.converted && ing.unit_override !== "original"
+          ? ing.converted
+          : ing.raw;
+
+      if (activeText.trim()) {
         const itemEl = document.createElement("li");
-        itemEl.textContent = ing.raw;
+        itemEl.textContent = activeText;
         prevIngredientsList.appendChild(itemEl);
       }
     });
@@ -530,6 +664,7 @@
       deleteHistory.length = 0;
 
       workspace.style.display = "block";
+      updateUnitToggleButtons();
       setView("edit");
 
       if (data.warnings && data.warnings.length > 0) {
@@ -546,6 +681,15 @@
 
   viewEditBtn.addEventListener("click", () => setView("edit"));
   viewPreviewBtn.addEventListener("click", () => setView("preview"));
+
+  [unitOrigBtn, unitMetricBtn, unitUkBtn].forEach((btn) => {
+    if (btn) {
+      btn.addEventListener("click", () => {
+        const unit = btn.getAttribute("data-unit");
+        switchUnitSystem(unit);
+      });
+    }
+  });
 
   addIngredientBtn.addEventListener("click", () => {
     updateRecipeFromEditor();

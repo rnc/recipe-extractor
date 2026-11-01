@@ -14,6 +14,8 @@ license-files = ["LICENSE", "NOTICE"]
 dependencies = [
     "beautifulsoup4>=4.15.0",
     "fastapi>=0.162.0",
+    "ingredient-parser-nlp>=2.9.1",
+    "pint>=0.26.2",
     "pydantic>=2.14.2",
     "recipe-scrapers>=15.13.0",
     "requests>=2.34.2",
@@ -26,7 +28,6 @@ dev = [
     "httpx2>=2.16.0",  # Starlette TestClient; plain httpx is rejected as unmaintained
     "mypy>=2.4.1",
     "pip-audit>=2.10.1",
-    "pre-commit",
     "pytest>=9.2.0",
     "ruff>=0.17.3",
 ]
@@ -38,7 +39,7 @@ recipe-extractor = "recipe_extractor.main:run"
 where = ["src"]
 
 [tool.setuptools.package-data]
-recipe_extractor = ["static/*"]
+recipe_extractor = ["static/*", "units/data/*"]
 
 [tool.black]
 line-length = 88

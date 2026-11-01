@@ -41,6 +41,15 @@ class Ingredient(BaseModel):
         default=None,
         description="Ingredient group heading (e.g. 'For the sauce')",
     )
+    converted: str | None = Field(
+        default=None, description="Converted text for the current unit system"
+    )
+    original_raw: str | None = Field(
+        default=None, description="Original un-converted text of the ingredient line"
+    )
+    unit_override: Literal["original", "metric", "uk"] | None = Field(
+        default=None, description="Per-line unit override"
+    )
 
 
 class Step(BaseModel):
@@ -92,6 +101,10 @@ class ExtractRequest(BaseModel):
     html: str | None = Field(
         default=None, description="Raw HTML string if provided directly"
     )
+    unit_system: Literal["original", "metric", "uk"] = Field(
+        default="original",
+        description="Optional unit system to convert to (defaults to original)",
+    )
 
 
 class ExtractResponse(BaseModel):
@@ -103,3 +116,22 @@ class ExtractResponse(BaseModel):
     warnings: list[str] = Field(
         default_factory=list, description="Non-fatal warnings during extraction"
     )
+
+
+class ConvertRequest(BaseModel):
+    """Request payload for /api/convert."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    recipe: Recipe
+    unit_system: Literal["original", "metric", "uk"] = Field(
+        default="metric", description="Target unit system"
+    )
+
+
+class ConvertResponse(BaseModel):
+    """Response payload for /api/convert."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    recipe: Recipe
