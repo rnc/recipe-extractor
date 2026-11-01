@@ -4,6 +4,7 @@
 
 Usage:
     python scripts/snapshot_samples.py [--refresh] [slug]
+    python scripts/snapshot_samples.py --add <url> [--slug <slug>]
 """
 
 from __future__ import annotations
@@ -11,11 +12,15 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 import tomllib
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
+from urllib.parse import urlparse
 
+from recipe_extractor.extract import extract_recipe
 from recipe_extractor.fetch import SafeFetcher
 from recipe_extractor.images import discover_image_urls, sniff_image_mime
 
@@ -106,17 +111,118 @@ def snapshot_sample(
     print(f"[{slug}] Saved successfully to {sample_dir}\n")
 
 
+def slugify_url(url: str) -> str:
+    """Generate a clean identifier slug from a URL path."""
+    parsed = urlparse(url)
+    path_parts = [p for p in parsed.path.strip("/").split("/") if p]
+    for part in reversed(path_parts):
+        clean = re.sub(r"[^\w-]", "", part).replace("-", "_").strip("_").lower()
+        if len(clean) > 3 and not (
+            clean.isalnum() and len(clean) < 10 and any(c.isdigit() for c in clean)
+        ):
+            return clean
+    if path_parts:
+        return (
+            re.sub(r"[^\w-]", "", path_parts[-1]).replace("-", "_").strip("_").lower()
+        )
+    return "sample_recipe"
+
+
+def add_sample_from_url(
+    url: str,
+    output_dir: Path,
+    *,
+    custom_slug: str | None = None,
+    refresh: bool = False,
+) -> None:
+    """Fetch recipe, snapshot it into private samples, and record into manifest.toml."""
+    slug = custom_slug or slugify_url(url)
+    print(f"Adding sample '{slug}' from {url}...")
+
+    # Fetch page
+    fetcher = SafeFetcher()
+    page = fetcher.fetch(url)
+
+    # Extract recipe to determine expectations
+    recipe, _ = extract_recipe(page.text, url=page.url, download_images=False)
+    title = recipe.title or "Untitled Recipe"
+    min_ingredients = max(1, len(recipe.ingredients))
+    min_steps = max(1, len(recipe.steps))
+
+    # Snapshot to private dir
+    snapshot_sample(slug, url, output_dir, refresh=True)
+
+    # Read existing manifest
+    manifest_data: dict[str, Any] = {"samples": {}}
+    if MANIFEST_PATH.exists():
+        try:
+            with open(MANIFEST_PATH, "rb") as f:
+                manifest_data = tomllib.load(f)
+        except Exception as e:
+            print(f"Warning: could not parse existing manifest: {e}", file=sys.stderr)
+
+    if "samples" not in manifest_data:
+        manifest_data["samples"] = {}
+
+    manifest_data["samples"][slug] = {
+        "url": url,
+        "title": title,
+        "min_ingredients": min_ingredients,
+        "min_steps": min_steps,
+    }
+
+    # Format manifest.toml
+    lines = [
+        "# SPDX-License-Identifier: Apache-2.0",
+        "# Manifest of sample recipe URLs and test expectations.",
+        "# Real snapshots are downloaded into tests/samples_private/ (gitignored).",
+        "",
+        "[samples]",
+    ]
+    for s_name, s_info in manifest_data["samples"].items():
+        lines.append(f"\n[samples.{s_name}]")
+        lines.append(f'url = "{s_info["url"]}"')
+        lines.append(f'title = "{s_info["title"]}"')
+        lines.append(f'min_ingredients = {s_info["min_ingredients"]}')
+        lines.append(f'min_steps = {s_info["min_steps"]}')
+
+    lines.append("")
+    MANIFEST_PATH.write_text("\n".join(lines), encoding="utf-8")
+    print(f"Updated {MANIFEST_PATH} with sample '{slug}'")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Download sample recipe snapshots into tests/samples_private/"
     )
     parser.add_argument(
+        "--add",
+        metavar="URL",
+        help="Add a new sample recipe URL to manifest and snapshot",
+    )
+    parser.add_argument("--slug", help="Custom slug when adding a sample with --add")
+    parser.add_argument(
         "--refresh", action="store_true", help="Overwrite existing snapshots"
     )
     parser.add_argument(
-        "slug", nargs="?", help="Optional specific slug from manifest to snapshot"
+        "slug_arg",
+        nargs="?",
+        metavar="slug",
+        help="Optional specific slug from manifest to snapshot",
     )
     args = parser.parse_args()
+
+    output_dir = get_samples_dir()
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    if args.add:
+        add_sample_from_url(
+            args.add,
+            output_dir,
+            custom_slug=args.slug,
+            refresh=args.refresh,
+        )
+        return
 
     if not MANIFEST_PATH.exists():
         print(f"Manifest not found at {MANIFEST_PATH}", file=sys.stderr)
@@ -130,16 +236,14 @@ def main() -> None:
         print("No samples configured in tests/samples/manifest.toml yet.")
         return
 
-    output_dir = get_samples_dir()
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    if args.slug:
-        if args.slug not in samples:
-            print(f"Slug '{args.slug}' not found in manifest.", file=sys.stderr)
+    target_slug = args.slug or args.slug_arg
+    if target_slug:
+        if target_slug not in samples:
+            print(f"Slug '{target_slug}' not found in manifest.", file=sys.stderr)
             sys.exit(1)
         snapshot_sample(
-            args.slug,
-            samples[args.slug]["url"],
+            target_slug,
+            samples[target_slug]["url"],
             output_dir,
             refresh=args.refresh,
         )
