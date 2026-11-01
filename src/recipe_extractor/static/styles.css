@@ -79,6 +79,30 @@ h1 {
 .input-group {
   flex: 1;
   min-width: 280px;
+  position: relative;
+}
+
+.input-group input[type="url"] {
+  padding-right: 2.5rem;
+}
+
+.input-clear {
+  position: absolute;
+  top: 50%;
+  right: 0.375rem;
+  transform: translateY(-50%);
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  font-size: 1.25rem;
+  line-height: 1;
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.input-clear:hover {
+  background-color: var(--secondary-hover);
+  color: var(--text-main);
 }
 
 input[type="url"],

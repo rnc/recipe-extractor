@@ -14,6 +14,7 @@
   // DOM Elements
   const extractForm = document.getElementById("extract-form");
   const recipeUrlInput = document.getElementById("recipe-url");
+  const clearUrlBtn = document.getElementById("clear-url-btn");
   const extractBtn = document.getElementById("extract-btn");
   const btnSpinner = document.getElementById("btn-spinner");
   const btnText = document.getElementById("btn-text");
@@ -637,6 +638,17 @@
   }
 
   // Event Listeners
+  function updateClearUrlButton() {
+    clearUrlBtn.style.display = recipeUrlInput.value ? "inline-flex" : "none";
+  }
+
+  recipeUrlInput.addEventListener("input", updateClearUrlButton);
+  clearUrlBtn.addEventListener("click", () => {
+    recipeUrlInput.value = "";
+    updateClearUrlButton();
+    recipeUrlInput.focus();
+  });
+
   extractForm.addEventListener("submit", async (e) => {
     e.preventDefault();
     const url = recipeUrlInput.value.trim();
