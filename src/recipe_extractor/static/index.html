@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<html lang="en-GB">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Recipe Extractor</title>
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="print.css" media="print" />
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1>Recipe Extractor</h1>
+        <p class="tagline">Extract, edit, and print clean recipes without clutter</p>
+      </header>
+
+      <!-- URL Input Section -->
+      <section class="card url-card">
+        <form id="extract-form" class="url-form">
+          <div class="input-group">
+            <input
+              type="url"
+              id="recipe-url"
+              name="recipe-url"
+              placeholder="Paste recipe URL here (e.g. https://www.bbcgoodfood.com/recipes/...)"
+              required
+              autocomplete="off"
+            />
+          </div>
+          <button type="submit" id="extract-btn" class="btn-primary">
+            <span id="btn-spinner" class="spinner" style="display: none;"></span>
+            <span id="btn-text">Extract Recipe</span>
+          </button>
+        </form>
+      </section>
+
+      <!-- Alerts / Status Messages -->
+      <div id="alert-box" class="alert" style="display: none;"></div>
+
+      <!-- Main Recipe Workspace (hidden until a recipe is loaded) -->
+      <main id="recipe-workspace" style="display: none;">
+        <!-- Top Toolbar -->
+        <div class="toolbar">
+          <div class="view-toggle">
+            <button id="view-edit-btn" class="btn-secondary active" type="button">Edit</button>
+            <button id="view-preview-btn" class="btn-secondary" type="button">Print Preview</button>
+          </div>
+          <div class="actions-group">
+            <button id="undo-btn" class="btn-secondary btn-small" type="button" style="display: none;">
+              Undo Delete
+            </button>
+            <button id="reset-btn" class="btn-secondary btn-small" type="button">
+              Reset
+            </button>
+            <button id="print-btn" class="btn-primary" type="button">
+              Print / Save as PDF
+            </button>
+          </div>
+        </div>
+
+        <!-- Editor View -->
+        <div id="editor-container" class="editor-container">
+          <!-- Metadata Card -->
+          <div class="card editor-section">
+            <h2 class="section-title">Recipe Details</h2>
+            <div class="meta-field">
+              <label for="recipe-title">Recipe Title</label>
+              <input type="text" id="recipe-title" placeholder="Title" />
+            </div>
+            <div class="meta-grid">
+              <div class="meta-field">
+                <label for="recipe-servings">Servings</label>
+                <input type="text" id="recipe-servings" placeholder="e.g. 4 servings" />
+              </div>
+              <div class="meta-field">
+                <label for="recipe-prep-time">Prep Time (mins)</label>
+                <input type="number" id="recipe-prep-time" min="0" placeholder="15" />
+              </div>
+              <div class="meta-field">
+                <label for="recipe-cook-time">Cook Time (mins)</label>
+                <input type="number" id="recipe-cook-time" min="0" placeholder="30" />
+              </div>
+              <div class="meta-field">
+                <label for="recipe-total-time">Total Time (mins)</label>
+                <input type="number" id="recipe-total-time" min="0" placeholder="45" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Images Section -->
+          <div class="card editor-section" id="images-section" style="display: none;">
+            <h2 class="section-title">Recipe Images</h2>
+            <p class="tagline" style="font-size: 0.85rem; margin-bottom: 0.5rem;">
+              Click an image to select it for printing, or remove it.
+            </p>
+            <div id="image-gallery" class="image-gallery"></div>
+          </div>
+
+          <!-- Ingredients Card -->
+          <div class="card editor-section">
+            <h2 class="section-title">Ingredients</h2>
+            <div id="ingredients-list" class="editable-list"></div>
+            <button id="add-ingredient-btn" class="btn-secondary btn-small" type="button">
+              + Add Ingredient
+            </button>
+          </div>
+
+          <!-- Method Steps Card -->
+          <div class="card editor-section">
+            <h2 class="section-title">Instructions / Method</h2>
+            <div id="steps-list" class="editable-list"></div>
+            <button id="add-step-btn" class="btn-secondary btn-small" type="button">
+              + Add Step
+            </button>
+          </div>
+
+          <!-- Notes Card -->
+          <div class="card editor-section">
+            <h2 class="section-title">Notes & Extra Instructions</h2>
+            <div id="notes-list" class="editable-list"></div>
+            <button id="add-note-btn" class="btn-secondary btn-small" type="button">
+              + Add Note
+            </button>
+          </div>
+        </div>
+
+        <!-- Print Preview View -->
+        <div id="preview-container" class="preview-container">
+          <article class="recipe-preview">
+            <header class="preview-header">
+              <h2 id="prev-title"></h2>
+              <div class="preview-meta">
+                <span id="prev-servings-box" style="display: none;">
+                  <strong>Servings:</strong> <span id="prev-servings"></span>
+                </span>
+                <span id="prev-prep-box" style="display: none;">
+                  <strong>Prep:</strong> <span id="prev-prep"></span> mins
+                </span>
+                <span id="prev-cook-box" style="display: none;">
+                  <strong>Cook:</strong> <span id="prev-cook"></span> mins
+                </span>
+                <span id="prev-total-box" style="display: none;">
+                  <strong>Total:</strong> <span id="prev-total"></span> mins
+                </span>
+              </div>
+            </header>
+
+            <div id="prev-image-container" class="preview-image" style="display: none;">
+              <img id="prev-image" src="" alt="Recipe photo" />
+            </div>
+
+            <div class="preview-body">
+              <section class="preview-ingredients">
+                <h3>Ingredients</h3>
+                <ul id="prev-ingredients-list"></ul>
+              </section>
+
+              <section class="preview-steps">
+                <h3>Method</h3>
+                <ol id="prev-steps-list"></ol>
+              </section>
+
+              <section id="prev-notes-section" class="preview-notes" style="display: none;">
+                <h3>Notes</h3>
+                <div id="prev-notes-list"></div>
+              </section>
+            </div>
+
+            <footer class="preview-footer">
+              <span id="prev-source-url"></span>
+            </footer>
+          </article>
+        </div>
+      </main>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>

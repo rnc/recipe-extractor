@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+# Read-only token by default; no job here needs more.
+permissions:
+  contents: read
+
+# Cancel superseded runs of the same ref.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # Every `uses:` is pinned to a full commit SHA with a version comment.
+      # See AGENTS.md ("GitHub Actions pinning").
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.14"
+      # pip-audit also audits pip itself, and the runner's bundled pip can lag.
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install -e ".[dev]"
+      - run: black --check .
+      - run: ruff check .
+      - run: mypy
+      - run: pytest
+      - run: pip-audit
+
+  # Lints the workflow files themselves. Same tools as the sibling
+  # shared-github-actions repo; zizmor also flags unpinned actions and
+  # script-injection risks.
+  lint-workflows:
+    name: Lint GitHub Actions
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Run actionlint
+        uses: raven-actions/actionlint@3d39aea434753780c3b3d4a1a31c854b4dbf49d7 # v2.2.0
+      - name: Run zizmor
+        uses: zizmorcore/zizmor-action@53290badfa369cb0bf7ad16342cb62c2fa47ac7b # v0.8.0
+        with:
+          # Report as annotations. The default (SARIF upload to the Security
+          # tab) would need `security-events: write`, and this job is read-only.
+          advanced-security: false
+          annotations: true

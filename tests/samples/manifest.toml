@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: Apache-2.0
+# Manifest of sample recipe URLs and test expectations.
+# Real snapshots are downloaded into tests/samples_private/ (gitignored).
+
+[samples]
+# Format example:
+# [samples.lemon_cake]
+# url = "https://www.example.com/lemon-cake"
+# title = "Classic Lemon Drizzle Cake"
+# min_ingredients = 5
+# min_steps = 3

@@ -1,0 +1,69 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "recipe-extractor"
+version = "0.1.0"
+description = "Paste a recipe URL, edit the extracted recipe, and print it."
+readme = "README.md"
+# 3.12 is the floor because pint 0.26 (Phase 2) needs it. Target runtime is 3.14.
+requires-python = ">=3.12"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+dependencies = [
+    "beautifulsoup4>=4.15.0",
+    "fastapi>=0.162.0",
+    "pydantic>=2.14.2",
+    "recipe-scrapers>=15.13.0",
+    "requests>=2.34.2",
+    "uvicorn>=0.54.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "black>=26.10.1",
+    "httpx2>=2.16.0",  # Starlette TestClient; plain httpx is rejected as unmaintained
+    "mypy>=2.4.1",
+    "pip-audit>=2.10.1",
+    "pre-commit",
+    "pytest>=9.2.0",
+    "ruff>=0.17.3",
+]
+
+[project.scripts]
+recipe-extractor = "recipe_extractor.main:run"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+recipe_extractor = ["static/*"]
+
+[tool.black]
+line-length = 88
+target-version = ["py312"]
+
+# ruff is used for linting only. Formatting is black's job, so the two never fight.
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+
+[tool.mypy]
+strict = true
+python_version = "3.12"
+files = ["src", "tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "live: fetches real sample URLs over the network (run with: pytest -m live)",
+]
+# Live tests are opt-in: excluded from the default run and from CI.
+addopts = "-m 'not live'"

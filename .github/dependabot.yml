@@ -1,0 +1,18 @@
+version: 2
+updates:
+  - package-ecosystem: "pip" # Reads pyproject.toml
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    # Wait after a new release before creating a PR, to reduce the risk of
+    # pulling in a compromised new version.
+    # https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference#cooldown-
+    cooldown:
+      default-days: 7
+
+  - package-ecosystem: "github-actions" # Keeps the SHA pins up to date
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7

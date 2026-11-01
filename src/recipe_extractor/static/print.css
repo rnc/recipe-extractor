@@ -1,0 +1,122 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 1.5cm;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-size: 11pt;
+    line-height: 1.4;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .container {
+    max-width: 100% !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Hide all app chrome and interactive elements */
+  header,
+  .card,
+  .toolbar,
+  .alert,
+  .editor-container,
+  button,
+  .no-print {
+    display: none !important;
+  }
+
+  /* Force preview view to be visible */
+  .preview-container {
+    display: block !important;
+  }
+
+  .recipe-preview {
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .preview-header {
+    border-bottom: 2pt solid #333333 !important;
+    padding-bottom: 8pt !important;
+    margin-bottom: 12pt !important;
+  }
+
+  .preview-header h2 {
+    font-size: 18pt !important;
+    margin-bottom: 4pt !important;
+  }
+
+  .preview-meta {
+    font-size: 10pt !important;
+    gap: 12pt !important;
+  }
+
+  .preview-image {
+    margin: 10pt 0 !important;
+  }
+
+  .preview-image img {
+    max-height: 220px !important;
+    object-fit: contain;
+  }
+
+  .preview-body {
+    display: grid !important;
+    grid-template-columns: 1fr 2fr !important;
+    gap: 16pt !important;
+  }
+
+  .preview-ingredients h3,
+  .preview-steps h3,
+  .preview-notes h3 {
+    font-size: 12pt !important;
+    border-bottom: 1pt solid #666666 !important;
+    padding-bottom: 2pt !important;
+    margin-bottom: 6pt !important;
+  }
+
+  .preview-ingredients ul,
+  .preview-steps ol {
+    padding-left: 14pt !important;
+  }
+
+  .preview-ingredients li,
+  .preview-steps li {
+    page-break-inside: avoid;
+    break-inside: avoid;
+    margin-bottom: 4pt !important;
+    font-size: 10pt !important;
+  }
+
+  .ingredient-group-title {
+    color: #000000 !important;
+    font-weight: bold !important;
+  }
+
+  .preview-notes {
+    page-break-inside: avoid;
+    break-inside: avoid;
+    background: #f8f8f8 !important;
+    border: 1pt solid #e0e0e0 !important;
+    padding: 8pt !important;
+    margin-top: 12pt !important;
+  }
+
+  .preview-footer {
+    border-top: 1pt solid #cccccc !important;
+    margin-top: 14pt !important;
+    padding-top: 6pt !important;
+    font-size: 8pt !important;
+    color: #555555 !important;
+  }
+}
