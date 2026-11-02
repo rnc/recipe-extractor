@@ -10,7 +10,7 @@ readme = "README.md"
 # 3.12 is the floor because pint 0.26 (Phase 2) needs it. Target runtime is 3.14.
 requires-python = ">=3.12"
 license = "Apache-2.0"
-license-files = ["LICENSE", "NOTICE"]
+license-files = ["LICENSE"]
 dependencies = [
     "beautifulsoup4>=4.15.0",
     "click>=8.5.0",
