@@ -80,11 +80,53 @@ def create_app(db_path: Path | None = None) -> FastAPI:
 app = create_app()
 
 
+def startup_banner(url: str) -> str:
+    """A separator and a colour block telling the user where the server is."""
+    text = f"Server running. Click here: {url}"
+    width = len(text) + 4
+    blank = click.style(" " * width, bg="green")
+    line = click.style(f"  {text}  ", fg="black", bg="green", bold=True)
+    return "\n".join(["", "─" * width, blank, line, blank, "Press CTRL+C to quit", ""])
+
+
+class StartupFilter(logging.Filter):
+    """Replace uvicorn's start-up chatter with a single banner.
+
+    Attached to ``uvicorn.error``. The "running on" record is the moment the socket
+    is listening, so the banner is printed then. With ``--debug`` the original
+    records are kept as well.
+    """
+
+    NOISE = (
+        "Started server process",
+        "Waiting for application startup",
+        "Application startup complete",
+        "Uvicorn running on",
+    )
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.debug = False
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        message = record.getMessage()
+        if not message.startswith(self.NOISE):
+            return True
+        if message.startswith("Uvicorn running on"):
+            click.echo(startup_banner(f"http://{HOST}:{PORT}"), err=True)
+        return self.debug
+
+
+_startup_filter = StartupFilter()
+
+
 def configure_logging(debug: bool) -> int:
     """Log to stderr at INFO, or DEBUG with ``--debug``. Returns the level."""
     level = logging.DEBUG if debug else logging.INFO
     logging.basicConfig(format="%(asctime)s %(levelname)s %(name)s %(message)s")
     logging.getLogger().setLevel(level)
+    _startup_filter.debug = debug
+    logging.getLogger("uvicorn.error").addFilter(_startup_filter)
     return level
 
 
@@ -113,7 +155,6 @@ def run(database: Path | None, debug: bool) -> None:
         logger.info("Library: persistence disabled")
     else:
         logger.info("Library: %s", database)
-    logger.info("Listening on http://%s:%d", HOST, PORT)
     uvicorn.run(
         server_app,
         host=HOST,

@@ -9,3 +9,9 @@ url = "https://www.taste.com.au/recipes/one-pan-salmon-broccoli-bake/m8i624wf"
 title = "One-pan salmon and broccoli bake"
 min_ingredients = 11
 min_steps = 3
+
+[samples.katsu_curry]
+url = "https://www.bbcgoodfood.com/recipes/katsu-curry"
+title = "Katsu curry"
+min_ingredients = 17
+min_steps = 4

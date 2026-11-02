@@ -42,5 +42,5 @@ htmlcov/
 .mypy_cache/
 .ruff_cache/
 
-# Private recipe sample snapshots (copyright protection - option B)
-tests/samples_private/
+# Private recipe sample snapshots
+tests/samples_private
