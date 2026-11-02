@@ -21,11 +21,26 @@ Requires Python 3.12 or newer (Python 3.14 recommended).
 
 ### 1. Set up virtual environment and install
 
+The recommended way is [uv](https://docs.astral.sh/uv/). The repository includes a `uv.lock` file, so every machine gets the same dependency versions, and uv downloads a suitable Python if the system one is too old.
+
+```sh
+uv sync --extra dev
+source .venv/bin/activate
+```
+
+This creates `.venv/` in the project directory and installs the app (editable) together with the development tools. Leave out `--extra dev` if you only want to run the app.
+
+If you use [zsh-autoswitch-virtualenv](https://github.com/MichaelAquilina/zsh-autoswitch-virtualenv), `uv.lock` makes it detect a uv project. In that case run `mkvenv --extra dev` (it passes the options to `uv sync`) instead of the two commands above, and the environment then activates whenever you `cd` into the directory.
+
+Without uv, plain pip also works. It ignores `uv.lock`, so versions may differ:
+
 ```sh
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
 ```
+
+To change dependencies, edit `pyproject.toml`, run `uv lock`, and commit both `pyproject.toml` and `uv.lock`. To upgrade everything to the newest allowed versions, run `uv lock --upgrade`.
 
 ### 2. Run the application
 
@@ -78,5 +93,5 @@ pip-audit
 
 ## Licence & Etiquette
 
-- **Licence:** Apache-2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
+- **Licence:** Apache-2.0. See [LICENSE](LICENSE).
 - **Personal Use:** Recipe Extractor is intended for personal recipe organization. Extracted text retains source URL attribution on printed copies.
