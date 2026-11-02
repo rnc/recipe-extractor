@@ -30,4 +30,6 @@ def test_no_private_samples_tracked() -> None:
 
 def test_samples_private_is_gitignored() -> None:
     lines = (ROOT / ".gitignore").read_text().splitlines()
-    assert "tests/samples_private/" in lines
+    # No trailing slash: that form would not match a symlink to a private repo.
+    assert "tests/samples_private" in lines
+    assert "tests/samples_private/" not in lines

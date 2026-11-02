@@ -71,7 +71,35 @@ def test_no_flag_enables_persistence_at_default(
     assert server.calls[0]["app"].state.library is not None
     assert server.calls[0]["host"] == "127.0.0.1"
     assert f"Library: {isolated_default}" in caplog.text
-    assert "Listening on http://127.0.0.1:8000" in caplog.text
+    assert "Listening on" not in caplog.text
+
+
+def _uvicorn_record(message: str) -> logging.LogRecord:
+    return logging.LogRecord("uvicorn.error", logging.INFO, "", 0, message, None, None)
+
+
+def test_startup_filter_replaces_uvicorn_chatter_with_banner(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    startup = main.StartupFilter()
+    assert startup.filter(_uvicorn_record("Started server process [1]")) is False
+    assert startup.filter(_uvicorn_record("Waiting for application startup.")) is False
+    assert startup.filter(_uvicorn_record("Application startup complete.")) is False
+    assert capsys.readouterr().err == ""
+
+    running = "Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)"
+    assert startup.filter(_uvicorn_record(running)) is False
+    err = capsys.readouterr().err
+    assert "Server running. Click here: http://127.0.0.1:8000" in err
+    assert "\x1b" not in err  # no colour codes when not a terminal
+
+    assert startup.filter(_uvicorn_record("Shutting down")) is True
+
+
+def test_startup_filter_keeps_records_in_debug() -> None:
+    startup = main.StartupFilter()
+    startup.debug = True
+    assert startup.filter(_uvicorn_record("Started server process [1]")) is True
 
 
 def test_disabled_turns_persistence_off(
